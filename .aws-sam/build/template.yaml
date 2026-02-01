@@ -1,0 +1,102 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Research Agent - AI-powered research assistant
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+    - dev
+    - prod
+  AnthropicApiKey:
+    Type: String
+    NoEcho: true
+    Description: Anthropic API key for Claude
+  TavilyApiKey:
+    Type: String
+    NoEcho: true
+    Description: Tavily API key for web search
+Globals:
+  Function:
+    Timeout: 300
+    MemorySize: 512
+    Runtime: python3.12
+Resources:
+  ResearchFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Sub: research-agent-role-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+  ResearchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: research-agent-${Environment}
+      CodeUri: ResearchFunction
+      Handler: handler.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - ResearchFunctionRole
+        - Arn
+      Environment:
+        Variables:
+          ENVIRONMENT:
+            Ref: Environment
+          ANTHROPIC_API_KEY:
+            Ref: AnthropicApiKey
+          TAVILY_API_KEY:
+            Ref: TavilyApiKey
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /research
+            Method: post
+            RestApiId:
+              Ref: ApiGateway
+            Auth:
+              ApiKeyRequired: true
+    Metadata:
+      SamResourceId: ResearchFunction
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name:
+        Fn::Sub: research-agent-api-${Environment}
+      StageName:
+        Ref: Environment
+      Auth:
+        ApiKeyRequired: true
+        UsagePlan:
+          CreateUsagePlan: PER_API
+          Description: Research Agent Usage Plan
+          Quota:
+            Limit: 100
+            Period: DAY
+          Throttle:
+            BurstLimit: 5
+            RateLimit: 2
+      Cors:
+        AllowMethods: '''POST, OPTIONS'''
+        AllowHeaders: '''Content-Type,x-api-key'''
+        AllowOrigin: '''*'''
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value:
+      Fn::Sub: https://$\{ApiGateway\}.execute-api.$\{AWS::Region\}.amazonaws.com/$\{Environment\}
+  ResearchFunctionArn:
+    Description: Research Lambda function ARN
+    Value:
+      Fn::GetAtt:
+      - ResearchFunction
+      - Arn
