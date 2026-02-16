@@ -1,0 +1,15 @@
+[project]
+name = "research-agent"
+version = "1.0.0"
+description = "Autonomous research agent with citations using Claude and Tavily"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
