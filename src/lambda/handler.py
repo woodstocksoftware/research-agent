@@ -6,9 +6,9 @@ Handles API Gateway requests for research queries.
 
 import json
 import os
+
 from anthropic import Anthropic
 from tavily import TavilyClient
-
 
 # Initialize clients
 anthropic_client = Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
@@ -60,7 +60,7 @@ Example format:
 ["What is X?", "Who are the main companies in X?", "What are the challenges of X?"]"""
         }]
     )
-    
+
     try:
         text = response.content[0].text
         if "```" in text:
@@ -68,7 +68,7 @@ Example format:
             if text.startswith("json"):
                 text = text[4:]
         return json.loads(text.strip())
-    except:
+    except Exception:
         return [
             f"What is {topic}?",
             f"Current state of {topic}",
@@ -83,7 +83,7 @@ def extract_findings(question: str, results: list[dict]) -> list[dict]:
         f"Source: {r['title']}\nURL: {r['url']}\nContent: {r['content']}"
         for r in results
     ])
-    
+
     response = anthropic_client.messages.create(
         model=MODEL,
         max_tokens=1024,
@@ -104,7 +104,7 @@ Return a JSON array of findings. Each finding should have:
 Only include factual, relevant information. Return ONLY valid JSON, no other text."""
         }]
     )
-    
+
     try:
         text = response.content[0].text
         if "```" in text:
@@ -112,14 +112,14 @@ Only include factual, relevant information. Return ONLY valid JSON, no other tex
             if text.startswith("json"):
                 text = text[4:]
         return json.loads(text.strip())
-    except:
+    except Exception:
         return []
 
 
 def identify_gaps(topic: str, findings: list[dict]) -> list[str]:
     """Identify gaps in current research."""
     findings_summary = "\n".join([f"- {f['fact']}" for f in findings[:20]])
-    
+
     response = anthropic_client.messages.create(
         model=MODEL,
         max_tokens=512,
@@ -139,7 +139,7 @@ If the research is comprehensive, return an empty array [].
 Return ONLY a JSON array, no other text."""
         }]
     )
-    
+
     try:
         text = response.content[0].text
         if "```" in text:
@@ -147,7 +147,7 @@ Return ONLY a JSON array, no other text."""
             if text.startswith("json"):
                 text = text[4:]
         return json.loads(text.strip())
-    except:
+    except Exception:
         return []
 
 
@@ -159,12 +159,12 @@ def synthesize_report(topic: str, findings: list[dict]) -> str:
         if f['fact'] not in seen:
             seen.add(f['fact'])
             unique_findings.append(f)
-    
+
     findings_text = "\n".join([
         f"- {f['fact']} [Source: {f['source']}]({f['url']})"
         for f in unique_findings
     ])
-    
+
     response = anthropic_client.messages.create(
         model=MODEL,
         max_tokens=4096,
@@ -188,41 +188,41 @@ Requirements:
 Write the report in Markdown format."""
         }]
     )
-    
+
     return response.content[0].text
 
 
 def research(topic: str) -> dict:
     """Run the full research pipeline."""
     log = []
-    
+
     # Phase 1: Planning
     log.append("Planning research questions...")
     questions = plan_research(topic)
     log.append(f"Generated {len(questions)} questions")
-    
+
     # Phase 2: Research Loop
     all_findings = []
     searched_queries = set()
-    
+
     for iteration in range(MAX_ITERATIONS):
         log.append(f"Research iteration {iteration + 1}/{MAX_ITERATIONS}")
-        
+
         new_findings = []
         for question in questions:
             if question in searched_queries:
                 continue
-            
+
             searched_queries.add(question)
             results = search(question, max_results=3)
-            
+
             if results:
                 findings = extract_findings(question, results)
                 new_findings.extend(findings)
                 log.append(f"  Found {len(findings)} findings for: {question[:50]}...")
-        
+
         all_findings.extend(new_findings)
-        
+
         # Gap Analysis
         if iteration < MAX_ITERATIONS - 1:
             gaps = identify_gaps(topic, all_findings)
@@ -232,11 +232,11 @@ def research(topic: str) -> dict:
             else:
                 log.append("Research complete, no gaps found")
                 break
-    
+
     # Phase 3: Synthesis
     log.append("Synthesizing final report...")
     report = synthesize_report(topic, all_findings)
-    
+
     return {
         "report": report,
         "findings_count": len(all_findings),
@@ -252,7 +252,7 @@ def lambda_handler(event, context):
         # Parse request
         body = json.loads(event.get('body', '{}'))
         topic = body.get('topic', '').strip()
-        
+
         if not topic:
             return {
                 'statusCode': 400,
@@ -262,12 +262,12 @@ def lambda_handler(event, context):
                 },
                 'body': json.dumps({'error': 'Topic is required'})
             }
-        
+
         print(f"Researching: {topic}")
-        
+
         # Run research
         result = research(topic)
-        
+
         return {
             'statusCode': 200,
             'headers': {
@@ -276,7 +276,7 @@ def lambda_handler(event, context):
             },
             'body': json.dumps(result)
         }
-        
+
     except Exception as e:
         print(f"Error: {str(e)}")
         return {

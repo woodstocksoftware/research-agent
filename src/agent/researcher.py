@@ -10,7 +10,9 @@ The agent uses a loop:
 """
 
 import json
+
 from anthropic import Anthropic
+
 from ..tools.search import SearchTool
 
 
@@ -20,15 +22,15 @@ class ResearchAgent:
         self.search_tool = SearchTool()
         self.model = "claude-sonnet-4-20250514"
         self.max_iterations = 3
-        
+
     def research(self, topic: str, on_status=None) -> str:
         """
         Research a topic and return a comprehensive report.
-        
+
         Args:
             topic: The research topic
             on_status: Optional callback for status updates (for UI)
-        
+
         Returns:
             Markdown-formatted research report
         """
@@ -36,56 +38,56 @@ class ResearchAgent:
             if on_status:
                 on_status(msg)
             print(msg)
-        
+
         # Phase 1: Planning
         status("📋 Planning research questions...")
         questions = self._plan_research(topic)
         status(f"   Generated {len(questions)} research questions")
-        
+
         # Phase 2: Research Loop
         all_findings = []
         searched_queries = set()
-        
+
         for iteration in range(self.max_iterations):
             status(f"\n🔍 Research iteration {iteration + 1}/{self.max_iterations}")
-            
+
             # Search for each question we haven't searched yet
             new_findings = []
             for question in questions:
                 if question in searched_queries:
                     continue
-                    
+
                 status(f"   Searching: {question[:50]}...")
                 searched_queries.add(question)
-                
+
                 results = self.search_tool.search(question, max_results=3)
-                
+
                 if results:
                     findings = self._extract_findings(question, results)
                     new_findings.extend(findings)
                     status(f"   Found {len(findings)} relevant findings")
-            
+
             all_findings.extend(new_findings)
-            
+
             # Phase 3: Gap Analysis
             if iteration < self.max_iterations - 1:
                 status("\n🔎 Analyzing gaps...")
                 gaps = self._identify_gaps(topic, all_findings)
-                
+
                 if gaps:
                     status(f"   Found {len(gaps)} gaps, generating new queries...")
                     questions = gaps
                 else:
                     status("   No significant gaps found")
                     break
-        
+
         # Phase 4: Synthesis
         status("\n📝 Synthesizing final report...")
         report = self._synthesize_report(topic, all_findings)
         status("✅ Research complete!")
-        
+
         return report
-    
+
     def _plan_research(self, topic: str) -> list[str]:
         """Generate research questions for the topic."""
         response = self.client.messages.create(
@@ -106,7 +108,7 @@ Example format:
 ["What is X?", "Who are the main companies in X?", "What are the challenges of X?"]"""
             }]
         )
-        
+
         try:
             # Extract JSON from response
             text = response.content[0].text
@@ -116,7 +118,7 @@ Example format:
                 if text.startswith("json"):
                     text = text[4:]
             return json.loads(text.strip())
-        except:
+        except Exception:
             # Fallback: simple questions
             return [
                 f"What is {topic}?",
@@ -124,7 +126,7 @@ Example format:
                 f"Key companies and players in {topic}",
                 f"Challenges and limitations of {topic}",
             ]
-    
+
     def _extract_findings(self, question: str, results: list[dict]) -> list[dict]:
         """Extract key findings from search results."""
         # Combine results into context
@@ -132,7 +134,7 @@ Example format:
             f"Source: {r['title']}\nURL: {r['url']}\nContent: {r['content']}"
             for r in results
         ])
-        
+
         response = self.client.messages.create(
             model=self.model,
             max_tokens=1024,
@@ -156,7 +158,7 @@ Example:
 [{{"fact": "AI agents market grew 40% in 2024", "source": "TechCrunch", "url": "https://..."}}]"""
             }]
         )
-        
+
         try:
             text = response.content[0].text
             if "```" in text:
@@ -164,13 +166,13 @@ Example:
                 if text.startswith("json"):
                     text = text[4:]
             return json.loads(text.strip())
-        except:
+        except Exception:
             return []
-    
+
     def _identify_gaps(self, topic: str, findings: list[dict]) -> list[str]:
         """Identify gaps in current research."""
         findings_summary = "\n".join([f"- {f['fact']}" for f in findings[:20]])
-        
+
         response = self.client.messages.create(
             model=self.model,
             max_tokens=512,
@@ -190,7 +192,7 @@ If the research is comprehensive, return an empty array [].
 Return ONLY a JSON array, no other text."""
             }]
         )
-        
+
         try:
             text = response.content[0].text
             if "```" in text:
@@ -198,9 +200,9 @@ Return ONLY a JSON array, no other text."""
                 if text.startswith("json"):
                     text = text[4:]
             return json.loads(text.strip())
-        except:
+        except Exception:
             return []
-    
+
     def _synthesize_report(self, topic: str, findings: list[dict]) -> str:
         """Synthesize findings into a final report."""
         # Deduplicate and format findings
@@ -210,12 +212,12 @@ Return ONLY a JSON array, no other text."""
             if f['fact'] not in seen:
                 seen.add(f['fact'])
                 unique_findings.append(f)
-        
+
         findings_text = "\n".join([
             f"- {f['fact']} [Source: {f['source']}]({f['url']})"
             for f in unique_findings
         ])
-        
+
         response = self.client.messages.create(
             model=self.model,
             max_tokens=4096,
@@ -239,7 +241,7 @@ Requirements:
 Write the report in Markdown format."""
             }]
         )
-        
+
         return response.content[0].text
 
 
