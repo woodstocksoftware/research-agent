@@ -1,7 +1,7 @@
 # CLAUDE.md — Research Agent
 
 > **Purpose:** Autonomous AI research agent that investigates topics and produces cited Markdown reports
-> **Owner:** Jim Williams - Woodstock Software LLC
+> **Owner:** Jim Williams - Desert's Edge Solutions LLC
 > **Repo:** woodstocksoftware/research-agent (public)
 
 ---
