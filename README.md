@@ -6,6 +6,8 @@ An AI-powered research agent that autonomously researches any topic and produces
 ![AWS](https://img.shields.io/badge/AWS-Lambda-orange)
 ![Claude](https://img.shields.io/badge/LLM-Claude-blueviolet)
 
+Part of [Dark Agent Factory](https://darkagentfactory.ai), built by Desert's Edge Solutions.
+
 ## What It Does
 
 1. **Plans** - Generates targeted research questions
